@@ -1,0 +1,10 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+[remote "baykarSecondTask"]
+	url = https://github.com/yasirozcn/baykarSecondTask
+	fetch = +refs/heads/*:refs/remotes/baykarSecondTask/*
