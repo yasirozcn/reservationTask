@@ -33,6 +33,7 @@ export const SeatMap = () => {
   const inactivityTimerRef = useRef<number | null>(null);
   const warningShownRef = useRef<boolean>(false);
   const secondTimerRef = useRef<number | null>(null);
+  const [validateForms, setValidateForms] = useState(false);
 
   const resetInactivityTimer = () => {
     if (inactivityTimerRef.current !== null) {
@@ -230,31 +231,56 @@ export const SeatMap = () => {
     setPassengers((prev) => ({ ...prev, [seatNumber]: data }));
   };
 
-  const isAllPassengersComplete = () => {
-    return selectedSeats.every((seatNumber) => {
-      const passenger = passengers[seatNumber];
-      return (
-        passenger && Object.values(passenger).every((value) => value !== "")
-      );
-    });
-  };
-
   const handleComplete = () => {
     if (selectedSeats.length === 0) {
       toast.error("Lütfen en az bir koltuk seçin!");
       return;
     }
 
-    if (!isAllPassengersComplete()) {
-      toast.error("Lütfen tüm yolcu bilgilerini eksiksiz doldurun!");
+    setValidateForms(true);
+
+    const hasErrors = selectedSeats.some((seatNumber) => {
+      const passenger = passengers[seatNumber];
+      if (!passenger) {
+        return true;
+      }
+
+      if (!passenger.name || /\d/.test(passenger.name)) {
+        return true;
+      }
+
+      if (!passenger.surname || /\d/.test(passenger.surname)) {
+        return true;
+      }
+
+      if (
+        !passenger.email ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(passenger.email)
+      ) {
+        return true;
+      }
+
+      if (!passenger.phone) {
+        return true;
+      }
+
+      if (!passenger.gender) {
+        return true;
+      }
+
+      if (!passenger.birthDate) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (hasErrors) {
+      toast.error("Lütfen tüm alanları doğru şekilde doldurun!");
       return;
     }
 
     const newOccupiedSeats = { ...occupiedSeats, ...passengers };
-    console.log(
-      "Rezervasyon tamamlandı, yeni occupiedSeats:",
-      newOccupiedSeats
-    );
     setOccupiedSeats(newOccupiedSeats);
 
     try {
@@ -264,10 +290,6 @@ export const SeatMap = () => {
         occupiedSeats: newOccupiedSeats,
       };
 
-      console.log(
-        "Rezervasyon sonrası localStorage'a kaydedilecek veriler:",
-        dataToStore
-      );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
     } catch (error) {
       console.error("Rezervasyon kaydetme hatası:", error);
@@ -275,6 +297,7 @@ export const SeatMap = () => {
 
     setSelectedSeats([]);
     setPassengers({});
+    setValidateForms(false);
 
     toast.success("Rezervasyon başarıyla tamamlandı!");
   };
@@ -369,6 +392,7 @@ export const SeatMap = () => {
               seatNumber={seatNumber}
               onClose={() => handleSeatSelect(seatNumber)}
               onSubmit={(data) => handlePassengerSubmit(seatNumber, data)}
+              validate={validateForms}
             />
           ))}
           {selectedSeats.length > 0 && (
