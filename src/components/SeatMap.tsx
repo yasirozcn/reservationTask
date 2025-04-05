@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Seat } from "./Seat";
 import { PassengerForm, PassengerData } from "./PassengerForm";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const SEAT_PRICE = 1000;
 const STORAGE_KEY = "reservationData";
+const INACTIVITY_TIMEOUT = 30000;
 
 interface ApiUser {
   id: number;
@@ -26,6 +29,113 @@ export const SeatMap = () => {
   const [occupiedSeats, setOccupiedSeats] = useState<
     Record<number, PassengerData>
   >({});
+
+  const inactivityTimerRef = useRef<number | null>(null);
+  const warningShownRef = useRef<boolean>(false);
+  const secondTimerRef = useRef<number | null>(null);
+
+  const resetInactivityTimer = () => {
+    if (inactivityTimerRef.current !== null) {
+      window.clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+
+    if (secondTimerRef.current !== null) {
+      window.clearTimeout(secondTimerRef.current);
+      secondTimerRef.current = null;
+    }
+
+    if (selectedSeats.length === 0) {
+      warningShownRef.current = false;
+      return;
+    }
+
+    inactivityTimerRef.current = window.setTimeout(() => {
+      if (!warningShownRef.current) {
+        warningShownRef.current = true;
+        toast.warning(
+          "İşleme devam etmek istiyor musunuz? 30 saniye içinde yanıt vermezseniz seçimleriniz sıfırlanacak.",
+          {
+            position: "top-center",
+            autoClose: false,
+            closeOnClick: false,
+            pauseOnHover: true,
+            draggable: false,
+          }
+        );
+
+        startSecondTimer();
+      }
+    }, INACTIVITY_TIMEOUT);
+  };
+
+  const startSecondTimer = () => {
+    if (secondTimerRef.current !== null) {
+      window.clearTimeout(secondTimerRef.current);
+      secondTimerRef.current = null;
+    }
+
+    secondTimerRef.current = window.setTimeout(() => {
+      toast.error("Süre doldu! Seçimleriniz sıfırlanıyor.", {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      clearSelections();
+    }, INACTIVITY_TIMEOUT);
+  };
+
+  const clearSelections = () => {
+    setSelectedSeats([]);
+    setPassengers({});
+    warningShownRef.current = false;
+
+    if (inactivityTimerRef.current !== null) {
+      window.clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+
+    if (secondTimerRef.current !== null) {
+      window.clearTimeout(secondTimerRef.current);
+      secondTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    const handleUserActivity = () => {
+      if (warningShownRef.current) {
+        toast.dismiss();
+        warningShownRef.current = false;
+      }
+      resetInactivityTimer();
+    };
+
+    window.addEventListener("mousemove", handleUserActivity);
+    window.addEventListener("keydown", handleUserActivity);
+    window.addEventListener("click", handleUserActivity);
+    return () => {
+      window.removeEventListener("mousemove", handleUserActivity);
+      window.removeEventListener("keydown", handleUserActivity);
+      window.removeEventListener("click", handleUserActivity);
+
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+      }
+
+      if (secondTimerRef.current !== null) {
+        window.clearTimeout(secondTimerRef.current);
+      }
+    };
+  }, [selectedSeats]);
+
+  useEffect(() => {
+    resetInactivityTimer();
+  }, [selectedSeats]);
+
+  useEffect(() => {
+    if (warningShownRef.current) {
+      startSecondTimer();
+    }
+  }, [warningShownRef.current]);
 
   useEffect(() => {
     try {
@@ -98,7 +208,7 @@ export const SeatMap = () => {
 
   const handleSeatSelect = (seatNumber: number) => {
     if (occupiedSeats[seatNumber]) {
-      alert("Bu koltuk dolu!");
+      toast.error("Bu koltuk dolu!");
       return;
     }
 
@@ -109,7 +219,7 @@ export const SeatMap = () => {
       setPassengers(newPassengers);
     } else {
       if (selectedSeats.length >= 3) {
-        alert("En fazla 3 koltuk seçebilirsiniz!");
+        toast.warning("En fazla 3 koltuk seçebilirsiniz!");
         return;
       }
       setSelectedSeats([...selectedSeats, seatNumber]);
@@ -131,12 +241,12 @@ export const SeatMap = () => {
 
   const handleComplete = () => {
     if (selectedSeats.length === 0) {
-      alert("Lütfen en az bir koltuk seçin!");
+      toast.error("Lütfen en az bir koltuk seçin!");
       return;
     }
 
     if (!isAllPassengersComplete()) {
-      alert("Lütfen tüm yolcu bilgilerini eksiksiz doldurun!");
+      toast.error("Lütfen tüm yolcu bilgilerini eksiksiz doldurun!");
       return;
     }
 
@@ -166,7 +276,7 @@ export const SeatMap = () => {
     setSelectedSeats([]);
     setPassengers({});
 
-    alert("Rezervasyon başarıyla tamamlandı!");
+    toast.success("Rezervasyon başarıyla tamamlandı!");
   };
 
   const renderSeats = () => {
@@ -228,49 +338,52 @@ export const SeatMap = () => {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-8">
-      <div className="relative">
-        <div className="absolute inset-0 bg-gray-100 -z-10 rounded-t-[120px]" />
-        <div className="flex flex-col items-center p-8 pt-16">
-          {renderSeats()}
+    <>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <div className="grid grid-cols-2 gap-8">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gray-100 -z-10 rounded-t-[120px]" />
+          <div className="flex flex-col items-center p-8 pt-16">
+            {renderSeats()}
+          </div>
+          <div className="flex justify-center gap-4 mt-4 pb-4">
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-gray-500 rounded mr-2" />
+              <span>Dolu</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-yellow-500 rounded mr-2" />
+              <span>Seçili</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 bg-white border border-gray-300 rounded mr-2" />
+              <span>Boş</span>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-center gap-4 mt-4 pb-4">
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-gray-500 rounded mr-2" />
-            <span>Dolu</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-yellow-500 rounded mr-2" />
-            <span>Seçili</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 bg-white border border-gray-300 rounded mr-2" />
-            <span>Boş</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="space-y-4">
-        {selectedSeats.map((seatNumber) => (
-          <PassengerForm
-            key={seatNumber}
-            seatNumber={seatNumber}
-            onClose={() => handleSeatSelect(seatNumber)}
-            onSubmit={(data) => handlePassengerSubmit(seatNumber, data)}
-          />
-        ))}
-        {selectedSeats.length > 0 && (
-          <>
-            <button
-              onClick={handleComplete}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              İşlemleri Tamamla ({selectedSeats.length} Yolcu)
-            </button>
-            {renderPriceInfo()}
-          </>
-        )}
+        <div className="space-y-4">
+          {selectedSeats.map((seatNumber) => (
+            <PassengerForm
+              key={seatNumber}
+              seatNumber={seatNumber}
+              onClose={() => handleSeatSelect(seatNumber)}
+              onSubmit={(data) => handlePassengerSubmit(seatNumber, data)}
+            />
+          ))}
+          {selectedSeats.length > 0 && (
+            <>
+              <button
+                onClick={handleComplete}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                İşlemleri Tamamla ({selectedSeats.length} Yolcu)
+              </button>
+              {renderPriceInfo()}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };

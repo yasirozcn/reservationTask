@@ -33,6 +33,18 @@ export const PassengerForm = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
+
+    if (name === "phone") {
+      const numericValue = value.replace(/[^0-9]/g, "");
+      const newFormData = {
+        ...formData,
+        [name]: numericValue,
+      };
+      setFormData(newFormData);
+      onSubmit(newFormData);
+      return;
+    }
+
     const newFormData = {
       ...formData,
       [name]: value,
@@ -50,7 +62,7 @@ export const PassengerForm = ({
           onClick={onClose}
           className="text-gray-600 hover:text-gray-800"
         >
-          ▼
+          X
         </button>
       </div>
       <div className="grid grid-cols-2 gap-4">
